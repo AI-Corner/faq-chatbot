@@ -8,9 +8,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # These will be set to lowercase in the jobs below
-  IMAGE_NAME_SERVER: faq-chatbot-server
-  IMAGE_NAME_CLIENT: faq-chatbot-client
+  IMAGE_SERVER: ghcr.io/ai-corner/faq-chatbot-server
+  IMAGE_CLIENT: ghcr.io/ai-corner/faq-chatbot-client
 
 jobs:
   # ============================================================
@@ -30,14 +29,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Lowercase repo owner
-        id: repo
-        run: |
-          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "IMAGE_SERVER=ghcr.io/$OWNER_LOWER/${{ env.IMAGE_NAME_SERVER }}" >> $GITHUB_ENV
-          echo "IMAGE_CLIENT=ghcr.io/$OWNER_LOWER/${{ env.IMAGE_NAME_CLIENT }}" >> $GITHUB_ENV
-          echo "owner_lower=$OWNER_LOWER" >> $GITHUB_OUTPUT
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -104,13 +95,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Lowercase repo owner
-        id: repo
-        run: |
-          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "IMAGE_SERVER=ghcr.io/$OWNER_LOWER/${{ env.IMAGE_NAME_SERVER }}" >> $GITHUB_ENV
-          echo "IMAGE_CLIENT=ghcr.io/$OWNER_LOWER/${{ env.IMAGE_NAME_CLIENT }}" >> $GITHUB_ENV
 
       # Create/update the K8s namespace
       - name: Ensure namespace exists
