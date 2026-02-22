@@ -1,7 +1,7 @@
 export const msalConfig = {
     auth: {
-        // These will be overridden by environment variables or injected at runtime
-        clientId: import.meta.env.VITE_AZURE_CLIENT_ID || '00000000-0000-0000-0000-000000000000',
+        // These must be provided via .env or build-args
+        clientId: import.meta.env.VITE_AZURE_CLIENT_ID,
         authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID || 'common'}`,
         redirectUri: window.location.origin,
     },
