@@ -10,6 +10,8 @@ Ask questions in natural language. When the bot doesn't know — a human answers
 [![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
 [![SQLite](https://img.shields.io/badge/SQLite-embedded-003B57?logo=sqlite&logoColor=white)](https://sqlite.org)
 [![Gemini](https://img.shields.io/badge/Google_Gemini-AI-4285F4?logo=google&logoColor=white)](https://ai.google.dev)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-k3s-326CE5?logo=kubernetes&logoColor=white)](https://k3s.io)
 
 </div>
 
@@ -112,6 +114,110 @@ npm run dev -- --port 4173
 
 ---
 
+## 🐳 Docker & Kubernetes Deployment (Rancher Desktop)
+
+The app ships with production-ready Docker images and Kubernetes manifests.
+
+### Prerequisites
+
+- **[Rancher Desktop](https://rancherdesktop.io/)** (or any local K8s cluster with Docker)
+- Docker and `kubectl` available on PATH
+
+### 1. Build Docker Images
+
+```powershell
+# Build backend image
+docker build -t faq-chatbot-server:latest .
+
+# Build frontend image (multi-stage: Node builds React → nginx serves)
+docker build -t faq-chatbot-client:latest ./client
+```
+
+### 2. Create the Namespace & Secret
+
+```powershell
+# Create namespace
+kubectl create namespace faq-chatbot
+
+# Inject your API key as a K8s Secret (never committed to git)
+kubectl create secret generic faq-secrets `
+  --from-literal=GOOGLE_API_KEY="YOUR_API_KEY_HERE" `
+  --namespace faq-chatbot
+```
+
+### 3. Apply All Manifests
+
+```powershell
+kubectl apply -f k8s/configmap.yaml `
+              -f k8s/pvc.yaml `
+              -f k8s/backend.yaml `
+              -f k8s/frontend.yaml
+```
+
+### 4. Verify Pods are Running
+
+```powershell
+kubectl get pods -n faq-chatbot
+# NAME                          READY   STATUS    RESTARTS   AGE
+# faq-client-655fb5df4f-blxmw   1/1     Running   0          30s
+# faq-server-74b57c579d-qw4ds   1/1     Running   0          30s
+
+kubectl get svc -n faq-chatbot
+# NAME             TYPE        CLUSTER-IP     PORT(S)        AGE
+# faq-server-svc   ClusterIP   10.43.207.111  4000/TCP       30s
+# faq-client-svc   NodePort    10.43.54.125   80:30080/TCP   30s
+```
+
+> ✅ Open **http://localhost:30080** in your browser.
+
+### K8s Architecture
+
+```
+Namespace: faq-chatbot
+│
+├── Secret: faq-secrets          ← GOOGLE_API_KEY (never in git)
+├── ConfigMap: faq-config        ← MODEL_NAME, THRESHOLD, DB_PATH
+├── PVC: faq-db-pvc (500Mi)      ← SQLite persisted on local-path volume
+│
+├── Deployment: faq-server       ← Express backend (port 4000)
+│   └── Service: faq-server-svc  ← ClusterIP (internal only)
+│
+└── Deployment: faq-client       ← nginx serving React (port 80)
+    └── Service: faq-client-svc  ← NodePort → localhost:30080
+```
+
+### Redeploying After Code Changes
+
+```powershell
+# Rebuild both images
+docker build -t faq-chatbot-server:latest .
+docker build -t faq-chatbot-client:latest ./client
+
+# Rolling restart (zero-downtime)
+kubectl rollout restart deployment -n faq-chatbot
+
+# Watch pods replace
+kubectl get pods -n faq-chatbot -w
+```
+
+### Useful kubectl Commands
+
+```powershell
+# View backend logs
+kubectl logs -n faq-chatbot deployment/faq-server -f
+
+# View frontend (nginx) logs
+kubectl logs -n faq-chatbot deployment/faq-client -f
+
+# Describe a pod (useful for debugging ImagePullBackOff etc.)
+kubectl describe pod -n faq-chatbot -l app=faq-server
+
+# Delete everything and start fresh
+kubectl delete namespace faq-chatbot
+```
+
+---
+
 ## 🗂️ Project Structure
 
 ```
@@ -119,13 +225,24 @@ faq-chatbot/
 │
 ├── index.js            ← Express API server (port 4000)
 ├── db.js               ← SQLite setup + cosine similarity
+├── Dockerfile          ← Backend container image
 ├── faq.db              ← Auto-created database (gitignored)
 ├── .env                ← Your secrets (gitignored)
 ├── .env.example        ← Template for new developers
 ├── ARCHITECTURE.md     ← Deep-dive: architecture, API, enhancement guides
 ├── README.md           ← This file
 │
-└── client/             ← React + Vite frontend (port 4173)
+├── k8s/                ← Kubernetes manifests
+│   ├── namespace.yaml  ← Namespace: faq-chatbot
+│   ├── secret.yaml     ← Template only — apply real secret via kubectl
+│   ├── configmap.yaml  ← Non-sensitive config
+│   ├── pvc.yaml        ← 500Mi PersistentVolumeClaim for SQLite
+│   ├── backend.yaml    ← Server Deployment + ClusterIP Service
+│   └── frontend.yaml   ← Client Deployment + NodePort Service (:30080)
+│
+└── client/             ← React + Vite frontend
+    ├── Dockerfile       ← Multi-stage: Node build → nginx serve
+    ├── nginx.conf       ← SPA routing + /api/ proxy to backend
     └── src/
         ├── App.jsx         ← Root component + navigation
         ├── App.css         ← All styling
@@ -265,16 +382,19 @@ By default, the admin panel is open to anyone. For production, see the **[ARCHIT
 
 | Need | Solution |
 |---|---|
+| Run locally with K8s | Rancher Desktop — see [Docker & K8s section](#-docker--kubernetes-deployment-rancher-desktop) above |
 | More users | Add rate limiting (see ARCHITECTURE.md §11) |
-| Large knowledge base (10k+ entries) | Migrate to PostgreSQL + pgvector (see §9.2) |
-| Multiple teams/departments | Add multi-tenancy support (see §9.3) |
-| Alert on new questions | Add email notifications (see §9.4) |
-| Containerise | Docker + docker-compose (see §9.6) |
+| Large knowledge base (10k+ entries) | Migrate to PostgreSQL + pgvector (see ARCHITECTURE.md §9.2) |
+| Multiple teams/departments | Add multi-tenancy support (see ARCHITECTURE.md §9.3) |
+| Alert on new questions | Add email notifications (see ARCHITECTURE.md §9.4) |
+| Update K8s config | Edit `k8s/configmap.yaml` and `kubectl apply -f k8s/` |
 
 ---
 
 ## 🗺️ Roadmap
 
+- [x] Docker containerisation (backend + frontend)
+- [x] Kubernetes manifests for Rancher Desktop / k3s
 - [ ] Microsoft Entra ID authentication
 - [ ] Email / Teams notifications for unanswered questions
 - [ ] PostgreSQL + pgvector for production scale

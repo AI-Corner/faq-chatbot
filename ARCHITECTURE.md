@@ -21,9 +21,10 @@
    - [9.4 Adding Email Notifications for Pending Questions](#94-adding-email-notifications-for-pending-questions)
    - [9.5 Improving Answer Quality with Re-ranking](#95-improving-answer-quality-with-re-ranking)
    - [9.6 Containerising with Docker](#96-containerising-with-docker)
-10. [Tuning the Similarity Threshold](#10-tuning-the-similarity-threshold)
-11. [Security Considerations](#11-security-considerations)
-12. [Roadmap Ideas](#12-roadmap-ideas)
+10. [Kubernetes Deployment (Rancher Desktop)](#10-kubernetes-deployment-rancher-desktop)
+11. [Tuning the Similarity Threshold](#11-tuning-the-similarity-threshold)
+12. [Security Considerations](#12-security-considerations)
+13. [Roadmap Ideas](#13-roadmap-ideas)
 
 ---
 
@@ -98,15 +99,26 @@ faq-chatbot/
 │
 ├── index.js                  # Express server — all API routes
 ├── db.js                     # SQLite setup, CRUD helpers, cosine similarity
+├── Dockerfile                # Backend container image (Node 20 Alpine)
 ├── faq.db                    # Auto-created SQLite database (gitignored)
 ├── .env                      # Environment variables (gitignored)
 ├── .env.example              # Template for new developers
 ├── package.json
 ├── ARCHITECTURE.md           # This file
 │
+├── k8s/                      # Kubernetes manifests
+│   ├── namespace.yaml        # Namespace: faq-chatbot
+│   ├── secret.yaml           # Template — real secret injected via kubectl
+│   ├── configmap.yaml        # Non-sensitive env config
+│   ├── pvc.yaml              # 500Mi PVC (local-path) for SQLite
+│   ├── backend.yaml          # Server Deployment + ClusterIP Service
+│   └── frontend.yaml         # Client Deployment + NodePort Service (:30080)
+│
 └── client/                   # React + Vite frontend
     ├── index.html
-    ├── vite.config.js
+    ├── Dockerfile             # Multi-stage: Node builds React → nginx serves
+    ├── nginx.conf             # SPA routing + /api/ proxy to backend
+    ├── vite.config.js         # Vite + dev proxy to localhost:4000
     ├── package.json
     └── src/
         ├── main.jsx          # App entry point
@@ -277,7 +289,7 @@ Or use the **Admin → Knowledge Base → Add New Entry** form in the UI.
 
 ---
 
-## 8. Environment Variables
+### 8. Environment Variables
 
 Create a `.env` file in the project root:
 
@@ -289,6 +301,7 @@ GOOGLE_API_KEY=AIza...              # Your Google AI Studio API key
 MODEL_NAME=gemini-2.5-flash         # LLM for answer generation
 SIMILARITY_THRESHOLD=0.75           # 0.0–1.0 — lower = more lenient matching
 PORT=4000                           # Backend server port
+DB_PATH=/data/faq.db                # Overridden in K8s to use PVC mount point
 ```
 
 ---
@@ -618,21 +631,26 @@ npm install cohere-ai
 
 ### 9.6 Containerising with Docker
 
-#### `Dockerfile` (backend)
+The project ships with production Dockerfiles for both services.
+
+#### Backend — `Dockerfile`
 
 ```dockerfile
 FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --production
-COPY . .
+COPY index.js db.js ./
+# DB_PATH env var points to PVC mount in K8s; defaults to ./faq.db locally
+ENV DB_PATH=/data/faq.db
 EXPOSE 4000
 CMD ["node", "index.js"]
 ```
 
-#### `client/Dockerfile`
+#### Frontend — `client/Dockerfile` (multi-stage)
 
 ```dockerfile
+# Stage 1: Build React app
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
@@ -640,41 +658,136 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginx:alpine
+# Stage 2: Serve via nginx
+FROM nginx:1.27-alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
 ```
 
-#### `docker-compose.yml`
+#### `client/nginx.conf`
 
-```yaml
-version: '3.9'
-services:
-  server:
-    build: .
-    ports:
-      - "4000:4000"
-    environment:
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - SIMILARITY_THRESHOLD=0.75
-    volumes:
-      - ./faq.db:/app/faq.db   # persist DB
+```nginx
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
 
-  client:
-    build: ./client
-    ports:
-      - "80:80"
-    depends_on:
-      - server
+    # Proxy all /api/* calls to the backend K8s service
+    location /api/ {
+        proxy_pass http://faq-server-svc:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_read_timeout 60s;
+    }
+
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
 ```
 
-```bash
-docker compose up --build
+> **Key design choice:** The frontend uses **relative API URLs** (`/api/...`). In Kubernetes, nginx proxies these to the `faq-server-svc` ClusterIP service. In local dev, Vite's `proxy` config in `vite.config.js` forwards them to `localhost:4000` — same behaviour, no hardcoded hostnames.
+
+#### Build Commands
+
+```powershell
+docker build -t faq-chatbot-server:latest .
+docker build -t faq-chatbot-client:latest ./client
 ```
 
 ---
 
-## 10. Tuning the Similarity Threshold
+## 10. Kubernetes Deployment (Rancher Desktop)
+
+The `k8s/` directory contains all manifests for deploying to a local Kubernetes cluster (tested on **Rancher Desktop / k3s v1.25**).
+
+### K8s Architecture
+
+```
+Namespace: faq-chatbot
+│
+├── Secret: faq-secrets           ← GOOGLE_API_KEY (injected at apply time, never in git)
+├── ConfigMap: faq-config         ← MODEL_NAME, SIMILARITY_THRESHOLD, PORT, DB_PATH
+├── PVC: faq-db-pvc (500Mi)       ← SQLite data persisted via local-path provisioner
+│
+├── Deployment: faq-server        ← 1 replica, Node.js Express
+│   ├── mounts PVC at /data
+│   ├── liveness:  GET /api/kb
+│   ├── readiness: GET /api/kb
+│   └── Service: faq-server-svc (ClusterIP :4000) — internal only
+│
+└── Deployment: faq-client        ← 1 replica, nginx
+    └── Service: faq-client-svc (NodePort 80:30080) → http://localhost:30080
+```
+
+### Resource Files
+
+| File | Description |
+|---|---|
+| `k8s/namespace.yaml` | Creates the `faq-chatbot` namespace |
+| `k8s/secret.yaml` | **Template only** — real secret is injected via `kubectl create secret` |
+| `k8s/configmap.yaml` | All non-sensitive config (`MODEL_NAME`, `DB_PATH`, etc.) |
+| `k8s/pvc.yaml` | `500Mi` PVC using `local-path` storage class (Rancher Desktop default) |
+| `k8s/backend.yaml` | Server Deployment + ClusterIP Service |
+| `k8s/frontend.yaml` | Client Deployment + NodePort Service on port `30080` |
+
+### Deployment Steps
+
+```powershell
+# 1. Build images
+docker build -t faq-chatbot-server:latest .
+docker build -t faq-chatbot-client:latest ./client
+
+# 2. Create namespace and inject secret (never commit real key to git)
+kubectl create namespace faq-chatbot
+kubectl create secret generic faq-secrets `
+  --from-literal=GOOGLE_API_KEY="YOUR_KEY" `
+  --namespace faq-chatbot
+
+# 3. Apply all resources
+kubectl apply -f k8s/configmap.yaml -f k8s/pvc.yaml -f k8s/backend.yaml -f k8s/frontend.yaml
+
+# 4. Verify
+kubectl get pods,svc -n faq-chatbot
+```
+
+> Open **http://localhost:30080**
+
+### Redeploy After Code Changes
+
+```powershell
+docker build -t faq-chatbot-server:latest .
+docker build -t faq-chatbot-client:latest ./client
+kubectl rollout restart deployment -n faq-chatbot
+kubectl get pods -n faq-chatbot -w    # watch rollout
+```
+
+### Useful Debugging Commands
+
+```powershell
+# Stream backend logs
+kubectl logs -n faq-chatbot deployment/faq-server -f
+
+# Shell into backend container
+kubectl exec -it -n faq-chatbot deployment/faq-server -- sh
+
+# Describe a crashing pod
+kubectl describe pod -n faq-chatbot -l app=faq-server
+
+# Tear down everything
+kubectl delete namespace faq-chatbot
+```
+
+### imagePullPolicy Note
+
+Both deployments use `imagePullPolicy: Never` which tells k3s to use locally available images only (does not pull from Docker Hub). This is correct for images built locally with `docker build`.
+
+---
+
+## 11. Tuning the Similarity Threshold
 
 The `SIMILARITY_THRESHOLD` (default: `0.75`) is the most important tuning parameter.
 
@@ -687,15 +800,17 @@ The `SIMILARITY_THRESHOLD` (default: `0.75`) is the most important tuning parame
 
 **Tip:** Check the `sources` field in the chat response (shown in the UI) to see similarity scores and calibrate accordingly.
 
+> **In K8s:** Update the threshold without rebuilding — edit `k8s/configmap.yaml` and run `kubectl apply -f k8s/configmap.yaml`, then `kubectl rollout restart deployment/faq-server -n faq-chatbot`.
+
 ---
 
-## 11. Security Considerations
+## 12. Security Considerations
 
 | Risk | Mitigation |
 |---|---|
 | Admin panel exposed publicly | Add Entra ID auth (§9.1) or IP allowlist via reverse proxy |
 | LLM prompt injection | System prompt instructs model to only use KB context; review answers for sensitive questions |
-| API key leakage | Store `GOOGLE_API_KEY` in `.env`, add `.env` to `.gitignore` |
+| API key leakage | Store `GOOGLE_API_KEY` in K8s Secret, never in git or ConfigMap |
 | Unlimited pending questions | Add rate limiting: `npm install express-rate-limit` |
 | SQLite not suited for high concurrency | Migrate to PostgreSQL for multi-user/multi-server deployments (§9.2) |
 
@@ -715,10 +830,12 @@ app.post('/api/chat', chatLimiter, async (req, res) => { ... })
 
 ---
 
-## 12. Roadmap Ideas
+## 13. Roadmap Ideas
 
 | Feature | Complexity | Impact |
 |---|---|---|
+| ✅ Docker containerisation | Done | — |
+| ✅ Kubernetes (Rancher Desktop / k3s) | Done | — |
 | Microsoft Entra ID auth for admin | Medium | 🔴 High (Security) |
 | Email notifications for pending questions | Low | 🟡 Medium |
 | Confidence score shown to user | Low | 🟡 Medium |
