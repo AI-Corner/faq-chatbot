@@ -38,6 +38,24 @@ db.exec(`
   );
 `);
 
+// Migration: Add feedback columns if they don't exist
+try {
+    const columns = db.prepare("PRAGMA table_info(knowledge_base)").all();
+    const hasLikes = columns.some(c => c.name === 'likes');
+    const hasReview = columns.some(c => c.name === 'review_requests');
+
+    if (!hasLikes) {
+        db.exec("ALTER TABLE knowledge_base ADD COLUMN likes INTEGER DEFAULT 0");
+        console.log("Added 'likes' column to knowledge_base");
+    }
+    if (!hasReview) {
+        db.exec("ALTER TABLE knowledge_base ADD COLUMN review_requests INTEGER DEFAULT 0");
+        console.log("Added 'review_requests' column to knowledge_base");
+    }
+} catch (err) {
+    console.error("Migration error:", err.message);
+}
+
 // --- Knowledge Base Operations ---
 
 function getAllKBEntries() {
