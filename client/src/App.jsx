@@ -32,8 +32,8 @@ function App() {
       <nav className="nav">
         <div className="container nav-container">
           <div className="nav-brand">
-            <span className="nav-icon">❉</span>
-            <span>UBS Private Wealth Management</span>
+            <span className="nav-icon">🏦</span>
+            <span>FAQ Support Assistant</span>
           </div>
           <div className="nav-tabs">
             <button

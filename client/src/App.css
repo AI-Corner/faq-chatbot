@@ -56,19 +56,22 @@ body,
 .nav {
   display: flex;
   align-items: center;
+  justify-content: center;
+  /* Forces the internal container to center */
   height: 80px;
   background: #ffffff;
   border-bottom: 1px solid #000000;
   /* Stronger accent border */
-  flex-shrink: 0;
+  width: 100%;
   z-index: 10;
 }
 
 .container {
   max-width: 1200px;
   width: 100%;
+  padding: 0 2rem;
   margin: 0 auto;
-  padding: 0 1.5rem;
+  /* Backup centering */
 }
 
 .nav-container {
@@ -124,6 +127,9 @@ body,
   flex: 1;
   overflow: hidden;
   display: flex;
+  justify-content: center;
+  /* Forces the main container to center */
+  width: 100%;
 }
 
 .main-container {
