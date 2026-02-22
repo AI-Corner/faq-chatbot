@@ -11,23 +11,25 @@
 }
 
 :root {
-  --bg-primary: #0a0f1e;
-  --bg-secondary: #111827;
-  --bg-card: rgba(255, 255, 255, 0.04);
-  --bg-card-hover: rgba(255, 255, 255, 0.07);
-  --border: rgba(255, 255, 255, 0.08);
-  --accent: #6366f1;
-  --accent-light: #818cf8;
-  --accent-glow: rgba(99, 102, 241, 0.25);
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #475569;
-  --radius: 0.75rem;
-  --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-  --transition: 0.2s ease;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f4f4f4;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f9f9f9;
+  --border: #e0e0e0;
+  --accent: #e00000;
+  /* UBS Red */
+  --accent-light: #ff1a1a;
+  --accent-glow: rgba(224, 0, 0, 0.1);
+  --success: #00853d;
+  --warning: #ffbf00;
+  --danger: #e00000;
+  --text-primary: #000000;
+  --text-secondary: #4a4a4a;
+  --text-muted: #757575;
+  --radius: 0px;
+  /* Minimalist / Square-ish */
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  --transition: 0.15s ease;
 }
 
 html,
@@ -54,10 +56,10 @@ body,
 .nav {
   display: flex;
   align-items: center;
-  height: 60px;
-  background: rgba(17, 24, 39, 0.95);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(12px);
+  height: 80px;
+  background: #ffffff;
+  border-bottom: 1px solid #000000;
+  /* Stronger accent border */
   flex-shrink: 0;
   z-index: 10;
 }
@@ -92,35 +94,30 @@ body,
 
 .nav-tabs {
   display: flex;
-  gap: 0.25rem;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 4px;
-  border-radius: 0.6rem;
-  border: 1px solid var(--border);
+  gap: 2rem;
+  padding: 0;
 }
 
 .nav-tab {
-  padding: 0.35rem 1rem;
+  padding: 0.5rem 0;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
-  border-radius: 0.45rem;
+  color: #000000;
   cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 0.95rem;
+  font-weight: 400;
   font-family: inherit;
   transition: all var(--transition);
+  border-bottom: 2px solid transparent;
 }
 
 .nav-tab.active {
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 0 16px var(--accent-glow);
+  font-weight: 700;
+  border-bottom: 2px solid var(--accent);
 }
 
 .nav-tab:hover:not(.active) {
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--accent);
 }
 
 .main-content {
@@ -223,11 +220,12 @@ body,
 
 .avatar.bot {
   background: var(--accent);
+  color: #fff;
 }
 
 .avatar.user {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: #000;
+  color: #fff;
 }
 
 .bubble {
@@ -238,16 +236,15 @@ body,
 }
 
 .message.bot .bubble {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-bottom-left-radius: 4px;
+  background: var(--bg-secondary);
+  border-left: 4px solid var(--accent);
+  /* Signature UBS vertical line */
   color: var(--text-primary);
 }
 
 .message.user .bubble {
-  background: var(--accent);
+  background: #000000;
   color: #fff;
-  border-bottom-right-radius: 4px;
 }
 
 .bubble.unanswered {
@@ -283,15 +280,14 @@ body,
 
 .chat-input {
   flex: 1;
-  padding: 0.75rem 1rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-primary);
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #000;
+  border-radius: 0;
+  color: #000;
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 1rem;
   outline: none;
-  transition: border-color var(--transition);
 }
 
 .chat-input:focus {
@@ -305,7 +301,7 @@ body,
 .btn {
   padding: 0.75rem 1.25rem;
   border: none;
-  border-radius: var(--radius);
+  border-radius: 0;
   cursor: pointer;
   font-family: inherit;
   font-size: 0.9rem;
@@ -316,46 +312,73 @@ body,
 .btn-primary {
   background: var(--accent);
   color: #fff;
+  border-radius: 0;
+  padding: 1rem 2rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .btn-primary:hover {
-  background: var(--accent-light);
+  background: #000000;
 }
 
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.btn-sm {
+  padding: 0.4rem 1rem;
+  font-size: 0.75rem;
 }
 
 .btn-danger {
-  background: rgba(239, 68, 68, 0.15);
+  background: transparent;
   color: var(--danger);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid var(--danger);
 }
 
 .btn-danger:hover {
-  background: rgba(239, 68, 68, 0.25);
+  background: var(--danger);
+  color: #fff;
 }
 
 .btn-success {
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--success);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: var(--success);
+  color: #fff;
+  border-radius: 0;
 }
 
 .btn-success:hover {
-  background: rgba(16, 185, 129, 0.25);
+  background: #000;
 }
 
 .btn-ghost {
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
+  background: transparent;
+  color: #000;
+  border: 1px solid #ccc;
 }
 
 .btn-ghost:hover {
-  border-color: var(--accent);
-  color: var(--accent-light);
+  border-color: #000;
+}
+
+/* ===== Notifications ===== */
+.notification {
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.notification.success {
+  background: #fff;
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.notification.error {
+  background: #fff;
+  color: var(--danger);
+  border: 1px solid var(--danger);
 }
 
 /* ===== Admin Page ===== */
@@ -370,14 +393,14 @@ body,
 }
 
 .admin-sidebar {
-  width: 200px;
+  width: 250px;
   flex-shrink: 0;
-  background: rgba(0, 0, 0, 0.25);
+  background: #fcfcfc;
   border-right: 1px solid var(--border);
-  padding: 1rem;
+  padding: 2rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.5rem;
 }
 
 .sidebar-item {
@@ -652,64 +675,48 @@ body,
 .nav-user {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.btn-logout {
-  padding: 0.35rem 0.75rem;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: var(--danger);
-  border-radius: 0.4rem;
-  cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 500;
-  transition: all var(--transition);
-}
-
-.btn-logout:hover {
-  background: rgba(239, 68, 68, 0.2);
+  gap: 1.5rem;
 }
 
 .auth-placeholder {
   max-width: 480px;
-  margin: auto;
-  text-align: center;
-  padding: 3rem 2rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  backdrop-filter: blur(10px);
-  animation: fadeUp 0.3s ease;
+  margin: 100px auto;
+  text-align: left;
+  padding: 3rem;
+  background: #fff;
+  border-left: 8px solid var(--accent);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
 }
 
 .auth-placeholder h2 {
-  margin-bottom: 0.75rem;
-  color: var(--text-primary);
-}
-
-.auth-placeholder p {
-  color: var(--text-secondary);
-  margin-bottom: 2rem;
-  font-size: 0.95rem;
+  font-size: 2.5rem;
+  font-weight: 300;
+  margin-bottom: 1.5rem;
+  color: #000;
 }
 
 .btn-login {
-  width: 100%;
-  padding: 0.8rem 1.5rem;
   background: var(--accent);
   color: #fff;
+  padding: 1rem 2rem;
   border: none;
-  border-radius: var(--radius);
-  font-weight: 600;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
   cursor: pointer;
-  transition: all var(--transition);
-  box-shadow: 0 4px 15px var(--accent-glow);
+  width: auto;
 }
 
 .btn-login:hover {
-  background: var(--accent-light);
-  transform: translateY(-2px);
+  background: #000;
+}
+
+.btn-logout {
+  color: #000;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
 }

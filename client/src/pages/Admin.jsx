@@ -147,15 +147,7 @@ export default function Admin() {
             <div className="admin-main">
                 {/* Notification */}
                 {notification && (
-                    <div style={{
-                        padding: '0.6rem 1rem',
-                        borderRadius: '0.5rem',
-                        marginBottom: '1rem',
-                        background: notification.type === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)',
-                        border: `1px solid ${notification.type === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)'}`,
-                        color: notification.type === 'error' ? '#ef4444' : '#10b981',
-                        fontSize: '0.875rem'
-                    }}>
+                    <div className={`notification ${notification.type}`}>
                         {notification.msg}
                     </div>
                 )}
@@ -199,10 +191,10 @@ export default function Admin() {
                                     </div>
                                 ) : (
                                     <div className="card-actions">
-                                        <button className="btn btn-primary" style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }} onClick={() => setExpandedId(q.id)}>
-                                            ✍️ Answer
+                                        <button className="btn btn-primary btn-sm" onClick={() => setExpandedId(q.id)}>
+                                            Answer
                                         </button>
-                                        <button className="btn btn-danger" style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }} onClick={() => dismissPending(q.id)}>
+                                        <button className="btn btn-danger btn-sm" onClick={() => dismissPending(q.id)}>
                                             Dismiss
                                         </button>
                                     </div>
@@ -284,11 +276,11 @@ export default function Admin() {
                                             {new Date(entry.created_at).toLocaleDateString()}
                                         </div>
                                         <div className="card-actions">
-                                            <button className="btn btn-ghost" style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }} onClick={() => { setEditId(entry.id); setEditAnswer(entry.answer) }}>
-                                                ✏️ Edit
+                                            <button className="btn btn-ghost btn-sm" onClick={() => { setEditId(entry.id); setEditAnswer(entry.answer) }}>
+                                                Edit
                                             </button>
-                                            <button className="btn btn-danger" style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }} onClick={() => deleteKBEntry(entry.id)}>
-                                                🗑 Delete
+                                            <button className="btn btn-danger btn-sm" onClick={() => deleteKBEntry(entry.id)}>
+                                                Delete
                                             </button>
                                         </div>
                                     </>
