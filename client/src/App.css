@@ -54,37 +54,32 @@ body,
 
 /* ===== Navbar ===== */
 .nav {
-  display: flex;
-  justify-content: center;
-  /* Centers the .container horizontally */
+  display: grid;
+  grid-template-columns: 1fr min(1100px, 92%) 1fr;
   align-items: center;
   height: 80px;
   background: #ffffff;
   border-bottom: 1px solid #000000;
   width: 100%;
   z-index: 10;
-  flex-shrink: 0;
 }
 
 .container {
+  grid-column: 2;
+  /* Forces content into the centered track */
   width: 100%;
-  max-width: 1100px;
-  /* Standard corporate content width */
-  margin: 0 auto;
-  padding: 0 2rem;
   display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 
 .nav-container {
-  justify-content: space-between;
   height: 100%;
 }
 
 .nav-container {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   height: 100%;
 }
 
@@ -132,19 +127,19 @@ body,
 
 .main-content {
   flex: 1;
-  display: flex;
-  justify-content: center;
-  /* Centers the .container horizontally */
+  display: grid;
+  grid-template-columns: 1fr min(1100px, 92%) 1fr;
   width: 100%;
   overflow: hidden;
   background-color: var(--bg-primary);
 }
 
 .main-container {
+  grid-column: 2;
+  display: flex;
   flex-direction: column;
-  align-items: center;
-  /* Centers the children (page content) */
   height: 100%;
+  width: 100%;
 }
 
 /* Ensure MSAL wrappers and Page blocks handle width correctly */
@@ -171,9 +166,9 @@ body,
   flex-direction: column;
   height: 100%;
   max-width: 800px;
-  /* Keeps the chat box focused and centered */
   width: 100%;
   margin: 0 auto;
+  /* Centers the chat box within the 1100px container */
 }
 
 .chat-messages {
