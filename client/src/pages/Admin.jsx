@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 
-const API = 'http://localhost:4000'
+// In K8s (served by nginx), /api/* is proxied to the backend service.
+// In local dev, Vite proxies via the devServer config or falls back to localhost.
+const API = import.meta.env.VITE_API_URL || ''
 
 export default function Admin() {
     const [section, setSection] = useState('pending')

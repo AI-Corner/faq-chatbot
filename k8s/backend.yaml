@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: faq-server
+  namespace: faq-chatbot
+  labels:
+    app: faq-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: faq-server
+  template:
+    metadata:
+      labels:
+        app: faq-server
+    spec:
+      containers:
+        - name: faq-server
+          image: faq-chatbot-server:latest
+          imagePullPolicy: Never   # Use locally built image
+          ports:
+            - containerPort: 4000
+          env:
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: faq-secrets
+                  key: GOOGLE_API_KEY
+            - name: MODEL_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: faq-config
+                  key: MODEL_NAME
+            - name: SIMILARITY_THRESHOLD
+              valueFrom:
+                configMapKeyRef:
+                  name: faq-config
+                  key: SIMILARITY_THRESHOLD
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: faq-config
+                  key: PORT
+            - name: DB_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: faq-config
+                  key: DB_PATH
+          volumeMounts:
+            - name: db-storage
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /api/kb
+              port: 4000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/kb
+              port: 4000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      volumes:
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: faq-db-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: faq-server-svc
+  namespace: faq-chatbot
+spec:
+  selector:
+    app: faq-server
+  ports:
+    - protocol: TCP
+      port: 4000
+      targetPort: 4000
+  type: ClusterIP

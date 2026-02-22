@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: faq-config
+  namespace: faq-chatbot
+data:
+  MODEL_NAME: "gemini-2.5-flash"
+  SIMILARITY_THRESHOLD: "0.75"
+  PORT: "4000"
+  DB_PATH: "/data/faq.db"

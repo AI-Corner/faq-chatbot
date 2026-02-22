@@ -1,7 +1,15 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, 'faq.db');
+// Support a configurable DB path (set DB_PATH env var to use a mounted volume in K8s)
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'faq.db');
+
+// Ensure the directory exists (important for mounted volumes in K8s)
+const dbDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
 const db = new Database(DB_PATH);
 
 // Enable WAL mode for better concurrent read performance
