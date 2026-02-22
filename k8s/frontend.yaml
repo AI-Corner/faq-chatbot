@@ -18,7 +18,8 @@ spec:
       containers:
         - name: faq-client
           image: faq-chatbot-client:latest
-          imagePullPolicy: Never   # Use locally built image
+          # IfNotPresent: uses local image if available, pulls from GHCR when deployed via CI/CD
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
           resources:

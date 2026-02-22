@@ -1,0 +1,151 @@
+name: CI/CD — Build, Push & Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]   # Build + test only on PRs (no deploy)
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_SERVER: ghcr.io/${{ github.repository_owner }}/faq-chatbot-server
+  IMAGE_CLIENT: ghcr.io/${{ github.repository_owner }}/faq-chatbot-client
+
+jobs:
+  # ============================================================
+  # JOB 1: Build and push Docker images to GitHub Container Registry
+  # Runs on: GitHub-hosted Ubuntu runner (free)
+  # ============================================================
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write   # needed to push to GHCR
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # GITHUB_TOKEN is auto-created by Actions — no secret needed for GHCR
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.IMAGE_SERVER }}
+            ${{ env.IMAGE_CLIENT }}
+          tags: |
+            type=sha,prefix=sha-       # e.g. sha-a1b2c3d
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # --- Build backend ---
+      - name: Build & push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name == 'push' }}   # don't push on PRs
+          tags: |
+            ${{ env.IMAGE_SERVER }}:latest
+            ${{ env.IMAGE_SERVER }}:sha-${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- Build frontend ---
+      - name: Build & push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./client
+          file: ./client/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ${{ env.IMAGE_CLIENT }}:latest
+            ${{ env.IMAGE_CLIENT }}:sha-${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================
+  # JOB 2: Deploy to Kubernetes
+  # Runs on: self-hosted runner (your Rancher Desktop machine)
+  # Only runs on pushes to main (not PRs)
+  # ============================================================
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: self-hosted          # ← your local machine with Rancher Desktop
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production       # optional: adds manual approval gate in GitHub
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Create/update the K8s namespace
+      - name: Ensure namespace exists
+        run: kubectl create namespace faq-chatbot --dry-run=client -o yaml | kubectl apply -f -
+
+      # Upsert the secret from GitHub Actions Secret
+      # GOOGLE_API_KEY is stored in: Repo → Settings → Secrets → Actions
+      - name: Create/update Kubernetes secret
+        run: |
+          kubectl create secret generic faq-secrets \
+            --from-literal=GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
+            --namespace faq-chatbot \
+            --dry-run=client -o yaml | kubectl apply -f -
+        # --dry-run=client -o yaml | kubectl apply  = upsert (create OR update)
+
+      # Pull images from GHCR — update imagePullPolicy and image references
+      - name: Update image references in manifests
+        run: |
+          export SERVER_IMAGE="ghcr.io/${{ github.repository_owner }}/faq-chatbot-server:sha-${{ github.sha }}"
+          export CLIENT_IMAGE="ghcr.io/${{ github.repository_owner }}/faq-chatbot-client:sha-${{ github.sha }}"
+          echo "Deploying server: $SERVER_IMAGE"
+          echo "Deploying client: $CLIENT_IMAGE"
+          kubectl set image deployment/faq-server faq-server="$SERVER_IMAGE" -n faq-chatbot 2>/dev/null || true
+          kubectl set image deployment/faq-client faq-client="$CLIENT_IMAGE" -n faq-chatbot 2>/dev/null || true
+
+      # Apply all manifests (idempotent — safe to re-run)
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/pvc.yaml
+          kubectl apply -f k8s/backend.yaml
+          kubectl apply -f k8s/frontend.yaml
+
+      # Update deployments to use GHCR images (in case manifest still has local tag)
+      - name: Patch deployments to use GHCR images
+        run: |
+          kubectl set image deployment/faq-server \
+            faq-server="ghcr.io/${{ github.repository_owner }}/faq-chatbot-server:sha-${{ github.sha }}" \
+            -n faq-chatbot
+
+          kubectl set image deployment/faq-client \
+            faq-client="ghcr.io/${{ github.repository_owner }}/faq-chatbot-client:sha-${{ github.sha }}" \
+            -n faq-chatbot
+
+        # Also update imagePullPolicy to IfNotPresent (images now come from GHCR)
+
+      # Wait for rollout to complete (max 3 minutes)
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/faq-server -n faq-chatbot --timeout=180s
+          kubectl rollout status deployment/faq-client -n faq-chatbot --timeout=180s
+
+      - name: Show running pods
+        run: kubectl get pods,svc -n faq-chatbot
