@@ -32,8 +32,8 @@ function App() {
       <nav className="nav">
         <div className="container nav-container">
           <div className="nav-brand">
-            <span className="nav-icon">🏦</span>
-            <span>FAQ Support Assistant</span>
+            <span className="nav-icon">🛡️</span>
+            <span>Corporate Support</span>
           </div>
           <div className="nav-tabs">
             <button
