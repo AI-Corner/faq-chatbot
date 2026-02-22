@@ -127,6 +127,7 @@ jobs:
           kubectl apply -f k8s/pvc.yaml
           kubectl apply -f k8s/backend.yaml
           kubectl apply -f k8s/frontend.yaml
+          kubectl apply -f k8s/ingress.yaml
 
       # Update deployments to use GHCR images (in case manifest still has local tag)
       - name: Patch deployments to use GHCR images

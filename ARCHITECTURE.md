@@ -23,6 +23,7 @@
    - [9.6 Containerising with Docker](#96-containerising-with-docker)
 10. [Kubernetes Deployment (Rancher Desktop)](#10-kubernetes-deployment-rancher-desktop)
     - [SQLite Persistence — Where Is the Database?](#sqlite-persistence--where-is-the-database)
+    - [HTTPS & Virtual Domain (faq.local)](#https--virtual-domain-faqlocal)
 11. [Tuning the Similarity Threshold](#11-tuning-the-similarity-threshold)
 12. [Security Considerations](#12-security-considerations)
 13. [Roadmap Ideas](#13-roadmap-ideas)
@@ -83,12 +84,12 @@
                              │
              ┌───────────────┴────────────────┐
              ▼                                ▼
-   ┌──────────────────┐          ┌─────────────────────────┐
-   │   SQLite (faq.db) │          │  Google Generative AI   │
-   │                  │          │  - gemini-embedding-001  │
-   │  knowledge_base  │          │  - gemini-2.5-flash      │
-   │  pending_questions│          └─────────────────────────┘
-   └──────────────────┘
+    ┌──────────────────┐          ┌─────────────────────────┐
+    │   SQLite (faq.db) │          │  Google Generative AI   │
+    │                  │          │  - gemini-embedding-001  │
+    │  knowledge_base  │          │  - gemini-2.5-flash      │
+    │  pending_questions│          └─────────────────────────┘
+    └──────────────────┘
 ```
 
 ---
@@ -113,7 +114,8 @@ faq-chatbot/
 │   ├── configmap.yaml        # Non-sensitive env config
 │   ├── pvc.yaml              # 500Mi PVC (local-path) for SQLite
 │   ├── backend.yaml          # Server Deployment + ClusterIP Service
-│   └── frontend.yaml         # Client Deployment + NodePort Service (:30080)
+│   ├── frontend.yaml         # Client Deployment + NodePort Service (:30080)
+│   └── ingress.yaml          # Ingress routing for https://faq.local
 │
 └── client/                   # React + Vite frontend
     ├── index.html
@@ -238,8 +240,6 @@ CREATE TABLE pending_questions (
 );
 ```
 
-> **Note on embeddings storage:** Embeddings are stored as JSON text in SQLite for simplicity. For production with 10,000+ entries, migrate to PostgreSQL with `pgvector` for native vector indexing (see §9.2).
-
 ---
 
 ## 7. Local Setup
@@ -274,23 +274,9 @@ npm run dev -- --port 4173
 
 Open **http://localhost:4173** in your browser.
 
-### Seed Initial Knowledge Base
-
-You can pre-populate the KB using the API:
-
-```powershell
-Invoke-RestMethod `
-  -Uri "http://localhost:4000/api/kb" `
-  -Method Post `
-  -Body '{"question":"What are your support hours?","answer":"Our support team is available Monday to Friday, 9am–6pm IST."}' `
-  -ContentType "application/json"
-```
-
-Or use the **Admin → Knowledge Base → Add New Entry** form in the UI.
-
 ---
 
-### 8. Environment Variables
+## 8. Environment Variables
 
 Create a `.env` file in the project root:
 
@@ -366,83 +352,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 )
 ```
 
-#### Step 5 — Protect the Admin Tab
-
-In `App.jsx`, wrap the Admin route:
-
-```jsx
-import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal } from '@azure/msal-react'
-import { loginRequest } from './authConfig'
-
-// In your App component:
-const { instance } = useMsal()
-const handleLogin = () => instance.loginPopup(loginRequest)
-
-// Replace Admin tab content:
-{page === 'admin' && (
-  <>
-    <AuthenticatedTemplate>
-      <Admin />
-    </AuthenticatedTemplate>
-    <UnauthenticatedTemplate>
-      <div style={{padding:'2rem', textAlign:'center'}}>
-        <p>Admin access requires sign-in.</p>
-        <button onClick={handleLogin}>Sign in with Microsoft</button>
-      </div>
-    </UnauthenticatedTemplate>
-  </>
-)}
-```
-
-#### Step 6 — Validate Token on Backend (Optional but Recommended)
-
-Install:
-```bash
-npm install jwks-rsa jsonwebtoken
-```
-
-Create `middleware/auth.js`:
-
-```js
-const jwt = require('jsonwebtoken')
-const jwksClient = require('jwks-rsa')
-
-const client = jwksClient({
-  jwksUri: `https://login.microsoftonline.com/<TENANT_ID>/discovery/v2.0/keys`
-})
-
-function getKey(header, callback) {
-  client.getSigningKey(header.kid, (err, key) => {
-    callback(err, key?.getPublicKey())
-  })
-}
-
-module.exports = function requireAuth(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1]
-  if (!token) return res.status(401).json({ error: 'Unauthorised' })
-
-  jwt.verify(token, getKey, {
-    audience: '<CLIENT_ID>',
-    issuer: `https://login.microsoftonline.com/<TENANT_ID>/v2.0`,
-  }, (err, decoded) => {
-    if (err) return res.status(401).json({ error: 'Invalid token' })
-    req.user = decoded
-    next()
-  })
-}
-```
-
-Apply to admin routes in `index.js`:
-
-```js
-const requireAuth = require('./middleware/auth')
-
-app.get('/api/kb',          requireAuth, ...)
-app.post('/api/kb',         requireAuth, ...)
-app.get('/api/pending',     requireAuth, ...)
-// etc.
-```
-
 ---
 
 ### 9.2 Switching to PostgreSQL with pgvector
@@ -480,152 +389,6 @@ CREATE TABLE knowledge_base (
 
 -- Create an IVFFlat index for fast approximate nearest-neighbor search
 CREATE INDEX ON knowledge_base USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-```
-
-#### Step 4 — Install Node.js pg Driver
-
-```bash
-npm install pg
-npm uninstall better-sqlite3
-```
-
-#### Step 5 — Update `db.js` similarity query
-
-```js
-const { Pool } = require('pg')
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-
-async function findTopMatches(queryEmbedding, topN = 3, threshold = 0.75) {
-  const vecString = `[${queryEmbedding.join(',')}]`
-  const result = await pool.query(`
-    SELECT id, question, answer, 1 - (embedding <=> $1::vector) AS score
-    FROM knowledge_base
-    WHERE 1 - (embedding <=> $1::vector) >= $2
-    ORDER BY score DESC
-    LIMIT $3
-  `, [vecString, threshold, topN])
-  return result.rows
-}
-```
-
----
-
-### 9.3 Adding Multi-Tenancy Support
-
-Support multiple teams/departments with isolated knowledge bases.
-
-#### Schema Change
-
-```sql
-ALTER TABLE knowledge_base     ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
-ALTER TABLE pending_questions  ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
-```
-
-#### API Change
-
-Pass `tenantId` in all requests and filter queries:
-
-```js
-// In /api/chat handler
-const { question, sessionId, tenantId = 'default' } = req.body
-
-// In db.js findTopMatches
-WHERE tenant_id = ? AND ...
-```
-
-#### Frontend Change
-
-Store `tenantId` in environment or user session (extracted from Entra ID token's `tid` or a custom claim).
-
----
-
-### 9.4 Adding Email Notifications for Pending Questions
-
-Notify admins when a user question cannot be answered automatically.
-
-#### Install Nodemailer
-
-```bash
-npm install nodemailer
-```
-
-#### Add to `.env`
-
-```env
-SMTP_HOST=smtp.office365.com
-SMTP_PORT=587
-SMTP_USER=noreply@yourcompany.com
-SMTP_PASS=your-app-password
-ADMIN_EMAIL=team@yourcompany.com
-```
-
-#### Create `mailer.js`
-
-```js
-const nodemailer = require('nodemailer')
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-})
-
-async function notifyAdminNewQuestion(question) {
-  await transporter.sendMail({
-    from: process.env.SMTP_USER,
-    to: process.env.ADMIN_EMAIL,
-    subject: '❓ New unanswered FAQ question',
-    html: `
-      <h3>A user asked a question your FAQ bot couldn't answer:</h3>
-      <blockquote style="border-left:3px solid #6366f1;padding-left:1rem;">
-        ${question}
-      </blockquote>
-      <p><a href="http://localhost:4173/?page=admin">Open Admin Panel →</a></p>
-    `,
-  })
-}
-
-module.exports = { notifyAdminNewQuestion }
-```
-
-#### Hook into `/api/chat` in `index.js`
-
-```js
-const { notifyAdminNewQuestion } = require('./mailer')
-
-// In the "no match" branch:
-const pendingId = db.addPendingQuestion(question, sessionId)
-await notifyAdminNewQuestion(question) // ← add this line
-```
-
----
-
-### 9.5 Improving Answer Quality with Re-ranking
-
-After retrieving top-K matches by cosine similarity, add a **cross-encoder re-ranking** step to pick the most relevant context.
-
-**Option A — Use Gemini itself as a judge:**
-
-```js
-async function rerankWithLLM(question, candidates) {
-  const model = genAI.getGenerativeModel({ model: MODEL_NAME })
-  const prompt = `Given the user question: "${question}"
-  
-  Rank the following KB entries from most to least relevant (return only IDs in JSON array):
-  ${candidates.map(c => `ID ${c.id}: ${c.question}`).join('\n')}
-  
-  Response format: [id1, id2, ...]`
-  
-  const result = await model.generateContent(prompt)
-  const order = JSON.parse(result.response.text())
-  return order.map(id => candidates.find(c => c.id === id)).filter(Boolean)
-}
-```
-
-**Option B — Use a Cohere Rerank API** (higher quality, external dependency):
-
-```bash
-npm install cohere-ai
 ```
 
 ---
@@ -690,15 +453,6 @@ server {
 }
 ```
 
-> **Key design choice:** The frontend uses **relative API URLs** (`/api/...`). In Kubernetes, nginx proxies these to the `faq-server-svc` ClusterIP service. In local dev, Vite's `proxy` config in `vite.config.js` forwards them to `localhost:4000` — same behaviour, no hardcoded hostnames.
-
-#### Build Commands
-
-```powershell
-docker build -t faq-chatbot-server:latest .
-docker build -t faq-chatbot-client:latest ./client
-```
-
 ---
 
 ## 10. Kubernetes Deployment (Rancher Desktop)
@@ -716,8 +470,6 @@ Namespace: faq-chatbot
 │
 ├── Deployment: faq-server        ← 1 replica, Node.js Express
 │   ├── mounts PVC at /data
-│   ├── liveness:  GET /api/kb
-│   ├── readiness: GET /api/kb
 │   └── Service: faq-server-svc (ClusterIP :4000) — internal only
 │
 └── Deployment: faq-client        ← 1 replica, nginx
@@ -734,76 +486,11 @@ Namespace: faq-chatbot
 | `k8s/pvc.yaml` | `500Mi` PVC using `local-path` storage class (Rancher Desktop default) |
 | `k8s/backend.yaml` | Server Deployment + ClusterIP Service |
 | `k8s/frontend.yaml` | Client Deployment + NodePort Service on port `30080` |
-
-### Deployment Steps
-
-```powershell
-# 1. Build images
-docker build -t faq-chatbot-server:latest .
-docker build -t faq-chatbot-client:latest ./client
-
-# 2. Create namespace and inject secret (never commit real key to git)
-kubectl create namespace faq-chatbot
-kubectl create secret generic faq-secrets `
-  --from-literal=GOOGLE_API_KEY="YOUR_KEY" `
-  --namespace faq-chatbot
-
-# 3. Apply all resources
-kubectl apply -f k8s/configmap.yaml -f k8s/pvc.yaml -f k8s/backend.yaml -f k8s/frontend.yaml
-
-# 4. Verify
-kubectl get pods,svc -n faq-chatbot
-```
-
-> Open **http://localhost:30080**
-
-### Redeploy After Code Changes
-
-```powershell
-docker build -t faq-chatbot-server:latest .
-docker build -t faq-chatbot-client:latest ./client
-kubectl rollout restart deployment -n faq-chatbot
-kubectl get pods -n faq-chatbot -w    # watch rollout
-```
-
-### Useful Debugging Commands
-
-```powershell
-# Stream backend logs
-kubectl logs -n faq-chatbot deployment/faq-server -f
-
-# Shell into backend container
-kubectl exec -it -n faq-chatbot deployment/faq-server -- sh
-
-# Describe a crashing pod
-kubectl describe pod -n faq-chatbot -l app=faq-server
-
-# Tear down everything
-kubectl delete namespace faq-chatbot
-```
+| `k8s/ingress.yaml` | Ingress routing for `https://faq.local` |
 
 ### SQLite Persistence — Where Is the Database?
 
 The SQLite database runs **inside the `faq-server` pod** but is stored on a **PersistentVolume outside the container**, so it survives pod restarts and rolling deployments.
-
-#### Verified Live State
-
-```
-Container path:   /data/faq.db         ← env var DB_PATH
-PVC name:         faq-db-pvc
-Capacity:         500Mi
-Storage class:    local-path           ← Rancher Desktop's built-in provisioner
-Reclaim policy:   Delete               ← ⚠️ see warning below
-Status:           Bound ✅
-```
-
-Files present inside `/data` at runtime (SQLite WAL mode):
-
-```
-/data/faq.db       ← main database file
-/data/faq.db-shm   ← shared memory file (WAL mode)
-/data/faq.db-wal   ← write-ahead log (in-progress transactions)
-```
 
 #### Storage Architecture
 
@@ -839,46 +526,68 @@ Files present inside `/data` at runtime (SQLite WAL mode):
 | `kubectl delete namespace faq-chatbot` | ❌ **No** — `ReclaimPolicy: Delete` removes the PV |
 | Rancher Desktop uninstalled / VM wiped | ❌ No — host storage is gone |
 
-#### ⚠️ ReclaimPolicy Warning
-
-The default `local-path` provisioner creates PVs with `persistentVolumeReclaimPolicy: Delete`.  
-This means **deleting the namespace also deletes all data**.
-
-**Before any destructive operation** (namespace delete, full teardown), either:
-
-**Option A — Back up the DB first:**
-```powershell
-# Copy faq.db out of the running pod to your local machine
-$POD = kubectl get pod -n faq-chatbot -l app=faq-server -o jsonpath='{.items[0].metadata.name}'
-kubectl cp "faq-chatbot/${POD}:/data/faq.db" ./faq-backup-$(Get-Date -Format 'yyyyMMdd-HHmm').db
-```
-
-**Option B — Patch PV to Retain before deleting:**
-```powershell
-# Get the PV name
-$PV = kubectl get pvc faq-db-pvc -n faq-chatbot -o jsonpath='{.spec.volumeName}'
-
-# Change reclaim policy so PV is NOT deleted with the namespace
-kubectl patch pv $PV -p '{\"spec\":{\"persistentVolumeReclaimPolicy\":\"Retain\"}}'
-
-# Now safe to delete namespace — PV will be kept in Released state
-kubectl delete namespace faq-chatbot
-```
-
-#### Inspecting the Database Live
-
-```powershell
-# List files on the PVC
-kubectl exec -n faq-chatbot deployment/faq-server -- ls -lah /data/
-
-# Open a SQLite shell inside the container
-kubectl exec -it -n faq-chatbot deployment/faq-server -- sh -c "sqlite3 /data/faq.db '.tables'"
-kubectl exec -it -n faq-chatbot deployment/faq-server -- sh -c "sqlite3 /data/faq.db 'SELECT id, question, source FROM knowledge_base;'"
-```
-
 ### imagePullPolicy Note
 
-Both deployments use `imagePullPolicy: Never` which tells k3s to use locally available images only (does not pull from Docker Hub). This is correct for images built locally with `docker build`.
+Both deployments use `imagePullPolicy: IfNotPresent` which allows using locally built images or pulling from GHCR as needed.
+
+### HTTPS & Virtual Domain (faq.local)
+
+Instead of using `http://localhost:30080` (NodePort), we use an **Ingress** to provide a production-like HTTPS experience with a custom hostname.
+
+#### 1. Generate local certificates (Self-Signed)
+We use the OpenSSL provided by Git for Windows:
+```powershell
+# Run this once on your machine to generate certs
+& "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 365 -newkey rsa:2048 `
+  -keyout tls.key -out tls.crt -subj "/CN=faq.local"
+```
+
+#### 2. Create the TLS Secret
+Inject the certificates into the cluster:
+```powershell
+kubectl create secret tls faq-tls-secret --key tls.key --cert tls.crt -n faq-chatbot
+```
+
+#### 3. Ingress Configuration
+The `k8s/ingress.yaml` defines the routing:
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: faq-ingress
+  namespace: faq-chatbot
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts: ["faq.local"]
+      secretName: faq-tls-secret
+  rules:
+    - host: faq.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: faq-client-svc
+                port:
+                  number: 80
+```
+
+#### 4. Local DNS Setup (Windows Hosts File)
+To make your browser recognize `faq.local`, add an entry to your hosts file:
+1. Open Notepad as **Administrator**.
+2. Open `C:\Windows\System32\drivers\etc\hosts`.
+3. Add this line at the bottom:
+   ```text
+   127.0.0.1  faq.local
+   ```
+
+> ✅ Open **[https://faq.local](https://faq.local)** in your browser.  
+> *Note: Since the cert is self-signed, you will see a security warning. Click "Advanced" -> "Proceed to faq.local (unsafe)".*
 
 ---
 
@@ -893,10 +602,6 @@ The `SIMILARITY_THRESHOLD` (default: `0.75`) is the most important tuning parame
 | `0.60` | More lenient — catches more variants, but may return loosely related answers. |
 | `< 0.50` | Too broad — almost anything matches, poor answer quality. |
 
-**Tip:** Check the `sources` field in the chat response (shown in the UI) to see similarity scores and calibrate accordingly.
-
-> **In K8s:** Update the threshold without rebuilding — edit `k8s/configmap.yaml` and run `kubectl apply -f k8s/configmap.yaml`, then `kubectl rollout restart deployment/faq-server -n faq-chatbot`.
-
 ---
 
 ## 12. Security Considerations
@@ -909,20 +614,6 @@ The `SIMILARITY_THRESHOLD` (default: `0.75`) is the most important tuning parame
 | Unlimited pending questions | Add rate limiting: `npm install express-rate-limit` |
 | SQLite not suited for high concurrency | Migrate to PostgreSQL for multi-user/multi-server deployments (§9.2) |
 
-### Rate Limiting Example
-
-```js
-const rateLimit = require('express-rate-limit')
-
-const chatLimiter = rateLimit({
-  windowMs: 60 * 1000,  // 1 minute
-  max: 20,              // 20 requests per IP per minute
-  message: { error: 'Too many requests, please slow down.' }
-})
-
-app.post('/api/chat', chatLimiter, async (req, res) => { ... })
-```
-
 ---
 
 ## 13. Roadmap Ideas
@@ -931,22 +622,13 @@ app.post('/api/chat', chatLimiter, async (req, res) => { ... })
 |---|---|---|
 | ✅ Docker containerisation | Done | — |
 | ✅ Kubernetes (Rancher Desktop / k3s) | Done | — |
+| ✅ Automated CI/CD (GitHub Actions) | Done | — |
+| ✅ HTTPS & Custom Domain Support | Done | — |
 | Microsoft Entra ID auth for admin | Medium | 🔴 High (Security) |
 | Email notifications for pending questions | Low | 🟡 Medium |
-| Confidence score shown to user | Low | 🟡 Medium |
-| Question clustering (auto-group similar pending questions) | Medium | 🟡 Medium |
-| Export KB to JSON/CSV | Low | 🟢 Low |
-| Multi-language support | Medium | 🟡 Medium |
+| Confusion/Unanswered analytics dashboard | Medium | 🟡 Medium |
 | Switch to pgvector + PostgreSQL | High | 🔴 High (Scale) |
-| Analytics dashboard (top questions, unanswered rate) | Medium | 🟡 Medium |
-| Webhook integration (Teams / Slack) | Medium | 🟡 Medium |
-| Fine-tuned embedding model on domain data | High | 🔴 High (Quality) |
 
 ---
 
 *Last updated: 2026-02-22*
-
- #   C D   F i x :   P o w e r S h e l l   - >   B a s h   T r a n s i t i o n :   0 2 / 2 2 / 2 0 2 6   1 3 : 3 7 : 3 6  
- 
- #   C D   F i x :   P o w e r S h e l l   N a t i v e :   0 2 / 2 2 / 2 0 2 6   1 3 : 4 0 : 2 6  
- 
