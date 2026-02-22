@@ -7,10 +7,17 @@ import Admin from './pages/Admin'
 import './App.css'
 
 function App() {
-  const [page, setPage] = useState('chat')
+  const [page, setPage] = useState(() => localStorage.getItem('faq_app_page') || 'chat')
   const { instance, accounts } = useMsal()
 
+  const setPageWithPersist = (newPage) => {
+    setPage(newPage)
+    localStorage.setItem('faq_app_page', newPage)
+  }
+
   const handleLogin = () => {
+    // Ensure we remember to come back to the admin page
+    localStorage.setItem('faq_app_page', 'admin')
     instance.loginRedirect(loginRequest).catch(e => console.error(e))
   }
 
@@ -30,13 +37,13 @@ function App() {
         <div className="nav-tabs">
           <button
             className={`nav-tab ${page === 'chat' ? 'active' : ''}`}
-            onClick={() => setPage('chat')}
+            onClick={() => setPageWithPersist('chat')}
           >
             💬 Chat
           </button>
           <button
             className={`nav-tab ${page === 'admin' ? 'active' : ''}`}
-            onClick={() => setPage('admin')}
+            onClick={() => setPageWithPersist('admin')}
           >
             🛠 Admin
           </button>
