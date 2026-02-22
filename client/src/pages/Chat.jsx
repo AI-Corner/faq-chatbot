@@ -62,6 +62,33 @@ export default function Chat() {
         }
     }
 
+    const handleFeedback = async (msgId, kbId, type) => {
+        const storageKey = `feedback_${kbId}`
+        if (localStorage.getItem(storageKey)) return
+
+        try {
+            await axios.post(`${API}/api/kb/${kbId}/${type}`)
+            localStorage.setItem(storageKey, type)
+
+            // Update local state to show feedback immediately
+            setMessages(prev => prev.map(msg => {
+                if (msg.id === msgId && msg.sources) {
+                    return {
+                        ...msg,
+                        sources: msg.sources.map(s => s.id === kbId ? {
+                            ...s,
+                            [type === 'like' ? 'likes' : 'review_requests']: (s[type === 'like' ? 'likes' : 'review_requests'] || 0) + 1,
+                            userFeedback: type
+                        } : s)
+                    }
+                }
+                return msg
+            }))
+        } catch (err) {
+            console.error('Feedback failed', err)
+        }
+    }
+
     return (
         <div className="chat-page page">
             <div className="chat-messages">
@@ -76,9 +103,29 @@ export default function Chat() {
                                 <div className="sources-list">
                                     📚 Answered from KB:
                                     {msg.sources.map((s, i) => (
-                                        <span key={i} className="source-chip" title={s.question}>
-                                            #{s.id} ({(parseFloat(s.score) * 100).toFixed(0)}% match)
-                                        </span>
+                                        <div key={i} className="source-item">
+                                            <span className="source-chip" title={s.question}>
+                                                #{s.id} ({(parseFloat(s.score) * 100).toFixed(0)}% match)
+                                            </span>
+                                            <div className="feedback-btns">
+                                                <button
+                                                    className={`feedback-btn ${s.userFeedback === 'like' ? 'active' : ''}`}
+                                                    onClick={() => handleFeedback(msg.id, s.id, 'like')}
+                                                    disabled={localStorage.getItem(`feedback_${s.id}`)}
+                                                    title="I found this helpful"
+                                                >
+                                                    👍 {s.likes || 0}
+                                                </button>
+                                                <button
+                                                    className={`feedback-btn ${s.userFeedback === 'review' ? 'active' : ''}`}
+                                                    onClick={() => handleFeedback(msg.id, s.id, 'review')}
+                                                    disabled={localStorage.getItem(`feedback_${s.id}`)}
+                                                    title="Needs review"
+                                                >
+                                                    🚩 {s.review_requests || 0}
+                                                </button>
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
                             )}

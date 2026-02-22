@@ -8,7 +8,7 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'faq.db');
 // Ensure the directory exists (important for mounted volumes in K8s)
 const dbDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+    fs.mkdirSync(dbDir, { recursive: true });
 }
 const db = new Database(DB_PATH);
 
@@ -21,10 +21,12 @@ db.exec(`
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     question   TEXT NOT NULL,
     answer     TEXT NOT NULL,
-    embedding  TEXT,       -- JSON array of numbers
-    source     TEXT DEFAULT 'admin',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    embedding       TEXT,       -- JSON array of numbers
+    source          TEXT DEFAULT 'admin',
+    likes           INTEGER DEFAULT 0,
+    review_requests INTEGER DEFAULT 0,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   CREATE TABLE IF NOT EXISTS pending_questions (
@@ -39,7 +41,7 @@ db.exec(`
 // --- Knowledge Base Operations ---
 
 function getAllKBEntries() {
-    return db.prepare('SELECT id, question, answer, source, created_at FROM knowledge_base ORDER BY created_at DESC').all();
+    return db.prepare('SELECT id, question, answer, source, likes, review_requests, created_at FROM knowledge_base ORDER BY created_at DESC').all();
 }
 
 function getKBEntryById(id) {
@@ -55,7 +57,15 @@ function addKBEntry(question, answer, embedding, source = 'admin') {
 }
 
 function updateKBEntry(id, answer) {
-    db.prepare('UPDATE knowledge_base SET answer = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(answer, id);
+    db.prepare('UPDATE knowledge_base SET answer = ?, likes = 0, review_requests = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(answer, id);
+}
+
+function incrementLikes(id) {
+    db.prepare('UPDATE knowledge_base SET likes = likes + 1 WHERE id = ?').run(id);
+}
+
+function incrementReviewRequests(id) {
+    db.prepare('UPDATE knowledge_base SET review_requests = review_requests + 1 WHERE id = ?').run(id);
 }
 
 function deleteKBEntry(id) {
@@ -63,7 +73,7 @@ function deleteKBEntry(id) {
 }
 
 function getAllKBWithEmbeddings() {
-    const rows = db.prepare('SELECT id, question, answer, embedding FROM knowledge_base WHERE embedding IS NOT NULL').all();
+    const rows = db.prepare('SELECT id, question, answer, embedding, likes, review_requests FROM knowledge_base WHERE embedding IS NOT NULL').all();
     return rows.map(r => ({ ...r, embedding: JSON.parse(r.embedding) }));
 }
 
@@ -127,4 +137,6 @@ module.exports = {
     getAllPendingQuestions,
     updatePendingStatus,
     findTopMatches,
+    incrementLikes,
+    incrementReviewRequests,
 };

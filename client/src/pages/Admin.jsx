@@ -273,6 +273,9 @@ export default function Admin() {
                                             <span className={`tag tag-${entry.source === 'admin' || entry.source === 'admin_from_pending' ? 'admin' : 'answered'}`}>
                                                 {entry.source}
                                             </span>
+                                            <span className="kb-stats">
+                                                👍 {entry.likes || 0} | 🚩 {entry.review_requests || 0}
+                                            </span>
                                             {new Date(entry.created_at).toLocaleDateString()}
                                         </div>
                                         <div className="card-actions">

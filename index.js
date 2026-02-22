@@ -72,7 +72,13 @@ app.post('/api/chat', async (req, res) => {
             return res.json({
                 answered: true,
                 answer,
-                sources: matches.map(m => ({ id: m.id, question: m.question, score: m.score.toFixed(3) })),
+                sources: matches.map(m => ({
+                    id: m.id,
+                    question: m.question,
+                    score: m.score.toFixed(3),
+                    likes: m.likes || 0,
+                    review_requests: m.review_requests || 0
+                })),
             });
         }
 
@@ -107,6 +113,25 @@ app.post('/api/kb', requireAuth, async (req, res) => {
         res.json({ id, message: 'Entry added to knowledge base.' });
     } catch (err) {
         res.status(500).json({ error: 'Failed to add KB entry.', details: err.message });
+    }
+});
+
+// User Feedback Endpoints
+app.post('/api/kb/:id/like', (req, res) => {
+    try {
+        db.incrementLikes(req.params.id);
+        res.json({ message: 'Like recorded.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to record like.' });
+    }
+});
+
+app.post('/api/kb/:id/review', (req, res) => {
+    try {
+        db.incrementReviewRequests(req.params.id);
+        res.json({ message: 'Review request recorded.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to record review request.' });
     }
 });
 

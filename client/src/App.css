@@ -277,11 +277,61 @@ body,
 }
 
 .sources-list {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
   border-top: 1px solid var(--border);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.source-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.feedback-btns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.feedback-btn {
+  background: transparent;
+  border: 1px solid #ddd;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
   color: var(--text-secondary);
+}
+
+.feedback-btn:hover:not(:disabled) {
+  border-color: #000;
+  color: #000;
+}
+
+.feedback-btn.active {
+  background: #f0f0f0;
+  border-color: #000;
+  color: #000;
+  font-weight: 600;
+}
+
+.feedback-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.feedback-btn[title*="review"].active {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .source-chip {
@@ -712,11 +762,10 @@ body,
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
 }
 
-.auth-placeholder h2 {
-  font-size: 2.5rem;
-  font-weight: 300;
-  margin-bottom: 1.5rem;
+.kb-stats {
+  font-weight: 600;
   color: #000;
+  margin: 0 1rem;
 }
 
 .btn-login {
