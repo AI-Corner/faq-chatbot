@@ -115,6 +115,13 @@ body,
   flex: 1;
   overflow: hidden;
   display: flex;
+  flex-direction: column;
+}
+
+/* Ensure MSAL wrappers take full width/height */
+.main-content > div {
+  width: 100%;
+  height: 100%;
 }
 
 /* ===== Page Containers ===== */
@@ -618,4 +625,70 @@ body,
   border-top: 1px solid var(--border);
   margin-top: 0.75rem;
   padding-top: 0.75rem;
+}
+
+/* ===== Auth & User UI ===== */
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.btn-logout {
+  padding: 0.35rem 0.75rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+  border-radius: 0.4rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all var(--transition);
+}
+
+.btn-logout:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.auth-placeholder {
+  max-width: 480px;
+  margin: auto;
+  text-align: center;
+  padding: 3rem 2rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(10px);
+  animation: fadeUp 0.3s ease;
+}
+
+.auth-placeholder h2 {
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.auth-placeholder p {
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+  font-size: 0.95rem;
+}
+
+.btn-login {
+  width: 100%;
+  padding: 0.8rem 1.5rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: 0 4px 15px var(--accent-glow);
+}
+
+.btn-login:hover {
+  background: var(--accent-light);
+  transform: translateY(-2px);
 }
