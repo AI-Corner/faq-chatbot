@@ -22,6 +22,7 @@
    - [9.5 Improving Answer Quality with Re-ranking](#95-improving-answer-quality-with-re-ranking)
    - [9.6 Containerising with Docker](#96-containerising-with-docker)
 10. [Kubernetes Deployment (Rancher Desktop)](#10-kubernetes-deployment-rancher-desktop)
+    - [SQLite Persistence — Where Is the Database?](#sqlite-persistence--where-is-the-database)
 11. [Tuning the Similarity Threshold](#11-tuning-the-similarity-threshold)
 12. [Security Considerations](#12-security-considerations)
 13. [Roadmap Ideas](#13-roadmap-ideas)
@@ -779,6 +780,100 @@ kubectl describe pod -n faq-chatbot -l app=faq-server
 
 # Tear down everything
 kubectl delete namespace faq-chatbot
+```
+
+### SQLite Persistence — Where Is the Database?
+
+The SQLite database runs **inside the `faq-server` pod** but is stored on a **PersistentVolume outside the container**, so it survives pod restarts and rolling deployments.
+
+#### Verified Live State
+
+```
+Container path:   /data/faq.db         ← env var DB_PATH
+PVC name:         faq-db-pvc
+Capacity:         500Mi
+Storage class:    local-path           ← Rancher Desktop's built-in provisioner
+Reclaim policy:   Delete               ← ⚠️ see warning below
+Status:           Bound ✅
+```
+
+Files present inside `/data` at runtime (SQLite WAL mode):
+
+```
+/data/faq.db       ← main database file
+/data/faq.db-shm   ← shared memory file (WAL mode)
+/data/faq.db-wal   ← write-ahead log (in-progress transactions)
+```
+
+#### Storage Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│           Pod: faq-server                        │
+│                                                  │
+│  Node.js (db.js)                                 │
+│      │  reads/writes via better-sqlite3          │
+│      ▼                                           │
+│  /data/faq.db  ◄─── volumeMount (PVC)           │
+│                                                  │
+└───────────────────────┬──────────────────────────┘
+                        │ PersistentVolumeClaim
+                        │ faq-db-pvc (500Mi)
+                        ▼
+┌─────────────────────────────────────────────────┐
+│    PersistentVolume  (local-path provisioner)    │
+│                                                  │
+│  Physical host path (Rancher Desktop Linux VM):  │
+│  /var/lib/rancher/k3s/storage/pvc-<uuid>/       │
+└─────────────────────────────────────────────────┘
+```
+
+#### Data Survival Matrix
+
+| Event | Data Survives? |
+|---|---|
+| Pod restart / crash | ✅ Yes — PVC reattaches automatically |
+| `kubectl rollout restart deployment` | ✅ Yes — rolling update, same PVC |
+| `kubectl delete pod <name>` | ✅ Yes — replacement pod mounts same PVC |
+| Node reboot | ✅ Yes — volume is on the host filesystem |
+| `kubectl delete namespace faq-chatbot` | ❌ **No** — `ReclaimPolicy: Delete` removes the PV |
+| Rancher Desktop uninstalled / VM wiped | ❌ No — host storage is gone |
+
+#### ⚠️ ReclaimPolicy Warning
+
+The default `local-path` provisioner creates PVs with `persistentVolumeReclaimPolicy: Delete`.  
+This means **deleting the namespace also deletes all data**.
+
+**Before any destructive operation** (namespace delete, full teardown), either:
+
+**Option A — Back up the DB first:**
+```powershell
+# Copy faq.db out of the running pod to your local machine
+$POD = kubectl get pod -n faq-chatbot -l app=faq-server -o jsonpath='{.items[0].metadata.name}'
+kubectl cp "faq-chatbot/${POD}:/data/faq.db" ./faq-backup-$(Get-Date -Format 'yyyyMMdd-HHmm').db
+```
+
+**Option B — Patch PV to Retain before deleting:**
+```powershell
+# Get the PV name
+$PV = kubectl get pvc faq-db-pvc -n faq-chatbot -o jsonpath='{.spec.volumeName}'
+
+# Change reclaim policy so PV is NOT deleted with the namespace
+kubectl patch pv $PV -p '{\"spec\":{\"persistentVolumeReclaimPolicy\":\"Retain\"}}'
+
+# Now safe to delete namespace — PV will be kept in Released state
+kubectl delete namespace faq-chatbot
+```
+
+#### Inspecting the Database Live
+
+```powershell
+# List files on the PVC
+kubectl exec -n faq-chatbot deployment/faq-server -- ls -lah /data/
+
+# Open a SQLite shell inside the container
+kubectl exec -it -n faq-chatbot deployment/faq-server -- sh -c "sqlite3 /data/faq.db '.tables'"
+kubectl exec -it -n faq-chatbot deployment/faq-server -- sh -c "sqlite3 /data/faq.db 'SELECT id, question, source FROM knowledge_base;'"
 ```
 
 ### imagePullPolicy Note
