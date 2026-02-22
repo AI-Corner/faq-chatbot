@@ -48,6 +48,16 @@ spec:
                 configMapKeyRef:
                   name: faq-config
                   key: DB_PATH
+            - name: AZURE_CLIENT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: faq-config
+                  key: AZURE_CLIENT_ID
+            - name: AZURE_TENANT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: faq-config
+                  key: AZURE_TENANT_ID
           volumeMounts:
             - name: db-storage
               mountPath: /data

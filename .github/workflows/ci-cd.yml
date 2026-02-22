@@ -79,6 +79,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            VITE_AZURE_CLIENT_ID=00000000-0000-0000-0000-000000000000
+            VITE_AZURE_TENANT_ID=00000000-0000-0000-0000-000000000000
 
   # ============================================================
   # JOB 2: Deploy to Kubernetes

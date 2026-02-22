@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useMsal } from '@azure/msal-react'
+import { loginRequest } from '../authConfig'
 import axios from 'axios'
 
 // In K8s (served by nginx), /api/* is proxied to the backend service.
@@ -6,6 +8,7 @@ import axios from 'axios'
 const API = import.meta.env.VITE_API_URL || ''
 
 export default function Admin() {
+    const { instance, accounts } = useMsal()
     const [section, setSection] = useState('pending')
     const [pending, setPending] = useState([])
     const [kb, setKb] = useState([])
@@ -18,6 +21,19 @@ export default function Admin() {
     const [editAnswer, setEditAnswer] = useState('')
     const [notification, setNotification] = useState(null)
 
+    const getAuthHeaders = useCallback(async () => {
+        try {
+            const response = await instance.acquireTokenSilent({
+                ...loginRequest,
+                account: accounts[0]
+            })
+            return { Authorization: `Bearer ${response.accessToken}` }
+        } catch (e) {
+            console.error('Failed to acquire token silently', e)
+            return {}
+        }
+    }, [instance, accounts])
+
     const notify = (msg, type = 'success') => {
         setNotification({ msg, type })
         setTimeout(() => setNotification(null), 3000)
@@ -26,20 +42,22 @@ export default function Admin() {
     const loadPending = useCallback(async () => {
         setLoading(true)
         try {
-            const { data } = await axios.get(`${API}/api/pending`)
+            const headers = await getAuthHeaders()
+            const { data } = await axios.get(`${API}/api/pending`, { headers })
             setPending(data)
         } catch (e) { console.error(e) }
         finally { setLoading(false) }
-    }, [])
+    }, [getAuthHeaders])
 
     const loadKb = useCallback(async () => {
         setLoading(true)
         try {
-            const { data } = await axios.get(`${API}/api/kb`)
+            const headers = await getAuthHeaders()
+            const { data } = await axios.get(`${API}/api/kb`, { headers })
             setKb(data)
         } catch (e) { console.error(e) }
         finally { setLoading(false) }
-    }, [])
+    }, [getAuthHeaders])
 
     useEffect(() => {
         if (section === 'pending') loadPending()
@@ -52,7 +70,8 @@ export default function Admin() {
         const answer = answerDraft[id]?.trim()
         if (!answer) return
         try {
-            await axios.post(`${API}/api/pending/${id}/answer`, { answer })
+            const headers = await getAuthHeaders()
+            await axios.post(`${API}/api/pending/${id}/answer`, { answer }, { headers })
             notify('✅ Answer saved to knowledge base!')
             setAnswerDraft(prev => { const n = { ...prev }; delete n[id]; return n })
             setExpandedId(null)
@@ -61,9 +80,12 @@ export default function Admin() {
     }
 
     const dismissPending = async (id) => {
-        await axios.post(`${API}/api/pending/${id}/dismiss`)
-        notify('🗑 Question dismissed')
-        loadPending()
+        try {
+            const headers = await getAuthHeaders()
+            await axios.post(`${API}/api/pending/${id}/dismiss`, {}, { headers })
+            notify('🗑 Question dismissed')
+            loadPending()
+        } catch (e) { notify('❌ Error dismissing question', 'error') }
     }
 
     // ---- KB Actions ----
@@ -73,7 +95,8 @@ export default function Admin() {
         if (!question.trim() || !answer.trim()) return
         setAddLoading(true)
         try {
-            await axios.post(`${API}/api/kb`, { question, answer })
+            const headers = await getAuthHeaders()
+            await axios.post(`${API}/api/kb`, { question, answer }, { headers })
             notify('✅ Entry added to knowledge base!')
             setAddForm({ question: '', answer: '' })
             loadKb()
@@ -83,16 +106,22 @@ export default function Admin() {
 
     const deleteKBEntry = async (id) => {
         if (!confirm('Delete this entry from the knowledge base?')) return
-        await axios.delete(`${API}/api/kb/${id}`)
-        notify('🗑 Entry deleted')
-        loadKb()
+        try {
+            const headers = await getAuthHeaders()
+            await axios.delete(`${API}/api/kb/${id}`, { headers })
+            notify('🗑 Entry deleted')
+            loadKb()
+        } catch (e) { notify('❌ Error deleting entry', 'error') }
     }
 
     const saveEdit = async (id) => {
-        await axios.put(`${API}/api/kb/${id}`, { answer: editAnswer })
-        notify('✅ Entry updated')
-        setEditId(null)
-        loadKb()
+        try {
+            const headers = await getAuthHeaders()
+            await axios.put(`${API}/api/kb/${id}`, { answer: editAnswer }, { headers })
+            notify('✅ Entry updated')
+            setEditId(null)
+            loadKb()
+        } catch (e) { notify('❌ Error updating entry', 'error') }
     }
 
     return (

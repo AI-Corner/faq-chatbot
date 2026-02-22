@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const db = require('./db');
+const requireAuth = require('./auth');
 
 const app = express();
 app.use(cors());
@@ -91,11 +92,11 @@ app.post('/api/chat', async (req, res) => {
 
 // ------- Knowledge Base CRUD -------
 
-app.get('/api/kb', (req, res) => {
+app.get('/api/kb', requireAuth, (req, res) => {
     res.json(db.getAllKBEntries());
 });
 
-app.post('/api/kb', async (req, res) => {
+app.post('/api/kb', requireAuth, async (req, res) => {
     const { question, answer } = req.body;
     if (!question || !answer) {
         return res.status(400).json({ error: 'question and answer are required.' });
@@ -109,30 +110,30 @@ app.post('/api/kb', async (req, res) => {
     }
 });
 
-app.put('/api/kb/:id', async (req, res) => {
+app.put('/api/kb/:id', requireAuth, async (req, res) => {
     const { answer } = req.body;
     if (!answer) return res.status(400).json({ error: 'answer is required.' });
     db.updateKBEntry(req.params.id, answer);
     res.json({ message: 'Entry updated.' });
 });
 
-app.delete('/api/kb/:id', (req, res) => {
+app.delete('/api/kb/:id', requireAuth, (req, res) => {
     db.deleteKBEntry(req.params.id);
     res.json({ message: 'Entry deleted.' });
 });
 
 // ------- Pending Questions (Admin) -------
 
-app.get('/api/pending', (req, res) => {
+app.get('/api/pending', requireAuth, (req, res) => {
     res.json(db.getPendingQuestions());
 });
 
-app.get('/api/pending/all', (req, res) => {
+app.get('/api/pending/all', requireAuth, (req, res) => {
     res.json(db.getAllPendingQuestions());
 });
 
 // Admin answers a pending question → adds it to KB
-app.post('/api/pending/:id/answer', async (req, res) => {
+app.post('/api/pending/:id/answer', requireAuth, async (req, res) => {
     const { answer } = req.body;
     if (!answer) return res.status(400).json({ error: 'answer is required.' });
 
@@ -151,7 +152,7 @@ app.post('/api/pending/:id/answer', async (req, res) => {
     }
 });
 
-app.post('/api/pending/:id/dismiss', (req, res) => {
+app.post('/api/pending/:id/dismiss', requireAuth, (req, res) => {
     db.updatePendingStatus(req.params.id, 'dismissed');
     res.json({ message: 'Question dismissed.' });
 });

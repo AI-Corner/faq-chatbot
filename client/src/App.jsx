@@ -1,10 +1,21 @@
 import { useState } from 'react'
+import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal } from '@azure/msal-react'
+import { loginRequest } from './authConfig'
 import Chat from './pages/Chat'
 import Admin from './pages/Admin'
 import './App.css'
 
 function App() {
   const [page, setPage] = useState('chat')
+  const { instance, accounts } = useMsal()
+
+  const handleLogin = () => {
+    instance.loginPopup(loginRequest).catch(e => console.error(e))
+  }
+
+  const handleLogout = () => {
+    instance.logoutPopup().catch(e => console.error(e))
+  }
 
   return (
     <div className="app-container">
@@ -27,9 +38,34 @@ function App() {
             🛠 Admin
           </button>
         </div>
+
+        <AuthenticatedTemplate>
+          <div className="nav-user">
+            <span>{accounts[0]?.name}</span>
+            <button onClick={handleLogout} className="btn-logout">Logout</button>
+          </div>
+        </AuthenticatedTemplate>
       </nav>
+
       <main className="main-content">
-        {page === 'chat' ? <Chat /> : <Admin />}
+        {page === 'chat' && <Chat />}
+
+        {page === 'admin' && (
+          <>
+            <AuthenticatedTemplate>
+              <Admin />
+            </AuthenticatedTemplate>
+            <UnauthenticatedTemplate>
+              <div className="auth-placeholder">
+                <h2>Admin Access Required</h2>
+                <p>Please sign in with your corporate account to manage the knowledge base.</p>
+                <button className="btn-login" onClick={handleLogin}>
+                  Sign in with Microsoft
+                </button>
+              </div>
+            </UnauthenticatedTemplate>
+          </>
+        )}
       </main>
     </div>
   )

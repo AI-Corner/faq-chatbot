@@ -624,7 +624,7 @@ The `SIMILARITY_THRESHOLD` (default: `0.75`) is the most important tuning parame
 | ✅ Kubernetes (Rancher Desktop / k3s) | Done | — |
 | ✅ Automated CI/CD (GitHub Actions) | Done | — |
 | ✅ HTTPS & Custom Domain Support | Done | — |
-| Microsoft Entra ID auth for admin | Medium | 🔴 High (Security) |
+| ✅ Microsoft Entra ID auth for admin | Done | — |
 | Email notifications for pending questions | Low | 🟡 Medium |
 | Confusion/Unanswered analytics dashboard | Medium | 🟡 Medium |
 | Switch to pgvector + PostgreSQL | High | 🔴 High (Scale) |
