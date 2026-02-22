@@ -90,6 +90,9 @@ jobs:
     runs-on: self-hosted          # ← your local machine with Rancher Desktop
     needs: build-and-push
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    defaults:
+      run:
+        shell: bash
     environment: production       # optional: adds manual approval gate in GitHub
 
     steps:
