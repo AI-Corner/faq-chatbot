@@ -61,20 +61,14 @@ function App() {
         {page === 'chat' && <Chat />}
 
         {page === 'admin' && (
-          <>
-            <AuthenticatedTemplate>
-              <Admin />
-            </AuthenticatedTemplate>
-            <UnauthenticatedTemplate>
-              <div className="auth-placeholder">
-                <h2>Admin Access Required</h2>
-                <p>Please sign in with your corporate account to manage the knowledge base.</p>
-                <button className="btn-login" onClick={handleLogin}>
-                  Sign in with Microsoft
-                </button>
-              </div>
-            </UnauthenticatedTemplate>
-          </>
+          <MsalAuthenticationTemplate
+            interactionType={InteractionType.Redirect}
+            authenticationRequest={loginRequest}
+            errorComponent={({ error }) => <p>Error: {error.errorMessage}</p>}
+            loadingComponent={() => <div className="empty-state"><span className="spinner" /> Authenticating...</div>}
+          >
+            <Admin />
+          </MsalAuthenticationTemplate>
         )}
       </main>
     </div>

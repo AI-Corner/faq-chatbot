@@ -6,8 +6,8 @@ export const msalConfig = {
         redirectUri: window.location.origin,
     },
     cache: {
-        cacheLocation: 'sessionStorage',
-        storeAuthStateInCookie: false,
+        cacheLocation: 'localStorage', // Persistence across reloads/redirects
+        storeAuthStateInCookie: true,   // Extra fallback for some browsers
     },
     system: {
         navigateToLoginRequestUrl: false, // Prevents popup window from loading the app
