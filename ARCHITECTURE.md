@@ -948,3 +948,5 @@ app.post('/api/chat', chatLimiter, async (req, res) => { ... })
 
  #   C D   F i x :   P o w e r S h e l l   - >   B a s h   T r a n s i t i o n :   0 2 / 2 2 / 2 0 2 6   1 3 : 3 7 : 3 6  
  
+ #   C D   F i x :   P o w e r S h e l l   N a t i v e :   0 2 / 2 2 / 2 0 2 6   1 3 : 4 0 : 2 6  
+ 

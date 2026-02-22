@@ -90,9 +90,6 @@ jobs:
     runs-on: self-hosted          # ← your local machine with Rancher Desktop
     needs: build-and-push
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    defaults:
-      run:
-        shell: bash
     environment: production       # optional: adds manual approval gate in GitHub
 
     steps:
@@ -107,21 +104,21 @@ jobs:
       # GOOGLE_API_KEY is stored in: Repo → Settings → Secrets → Actions
       - name: Create/update Kubernetes secret
         run: |
-          kubectl create secret generic faq-secrets \
-            --from-literal=GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
-            --namespace faq-chatbot \
+          kubectl create secret generic faq-secrets `
+            --from-literal=GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" `
+            --namespace faq-chatbot `
             --dry-run=client -o yaml | kubectl apply -f -
         # --dry-run=client -o yaml | kubectl apply  = upsert (create OR update)
 
       # Pull images from GHCR — update imagePullPolicy and image references
       - name: Update image references in manifests
         run: |
-          export SERVER_IMAGE="${{ env.IMAGE_SERVER }}:sha-${{ github.sha }}"
-          export CLIENT_IMAGE="${{ env.IMAGE_CLIENT }}:sha-${{ github.sha }}"
-          echo "Deploying server: $SERVER_IMAGE"
-          echo "Deploying client: $CLIENT_IMAGE"
-          kubectl set image deployment/faq-server faq-server="$SERVER_IMAGE" -n faq-chatbot 2>/dev/null || true
-          kubectl set image deployment/faq-client faq-client="$CLIENT_IMAGE" -n faq-chatbot 2>/dev/null || true
+          $SERVER_IMAGE = "${{ env.IMAGE_SERVER }}:sha-${{ github.sha }}"
+          $CLIENT_IMAGE = "${{ env.IMAGE_CLIENT }}:sha-${{ github.sha }}"
+          Write-Host "Deploying server: $SERVER_IMAGE"
+          Write-Host "Deploying client: $CLIENT_IMAGE"
+          kubectl set image deployment/faq-server faq-server="$SERVER_IMAGE" -n faq-chatbot 2>$null
+          kubectl set image deployment/faq-client faq-client="$CLIENT_IMAGE" -n faq-chatbot 2>$null
 
       # Apply all manifests (idempotent — safe to re-run)
       - name: Apply Kubernetes manifests
@@ -134,12 +131,12 @@ jobs:
       # Update deployments to use GHCR images (in case manifest still has local tag)
       - name: Patch deployments to use GHCR images
         run: |
-          kubectl set image deployment/faq-server \
-            faq-server="${{ env.IMAGE_SERVER }}:sha-${{ github.sha }}" \
+          kubectl set image deployment/faq-server `
+            faq-server="${{ env.IMAGE_SERVER }}:sha-${{ github.sha }}" `
             -n faq-chatbot
 
-          kubectl set image deployment/faq-client \
-            faq-client="${{ env.IMAGE_CLIENT }}:sha-${{ github.sha }}" \
+          kubectl set image deployment/faq-client `
+            faq-client="${{ env.IMAGE_CLIENT }}:sha-${{ github.sha }}" `
             -n faq-chatbot
 
         # Also update imagePullPolicy to IfNotPresent (images now come from GHCR)
