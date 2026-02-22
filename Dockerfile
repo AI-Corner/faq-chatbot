@@ -8,7 +8,7 @@ COPY package*.json ./
 RUN npm ci --production
 
 # Copy source
-COPY index.js db.js ./
+COPY index.js db.js auth.js ./
 
 # SQLite DB lives on a mounted volume at runtime
 # /data is the volume mount point
