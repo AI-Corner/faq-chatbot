@@ -68,7 +68,7 @@ export default function Chat() {
                 {messages.map(msg => (
                     <div key={msg.id} className={`message ${msg.role}`}>
                         <div className={`avatar ${msg.role}`}>
-                            {msg.role === 'bot' ? '🏦' : '👤'}
+                            {msg.role === 'bot' ? '🛡️' : '👤'}
                         </div>
                         <div className={`bubble ${!msg.answered ? 'unanswered' : ''}`}>
                             {msg.text}

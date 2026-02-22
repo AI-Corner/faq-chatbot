@@ -33,7 +33,7 @@ function App() {
         <div className="container nav-container">
           <div className="nav-brand">
             <span className="nav-icon">🛡️</span>
-            <span>Corporate Support</span>
+            <span>Corporate Support Assistant</span>
           </div>
           <div className="nav-tabs">
             <button
