@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal } from '@azure/msal-react'
+import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal, MsalAuthenticationTemplate } from '@azure/msal-react'
+import { InteractionType } from '@azure/msal-browser'
 import { loginRequest } from './authConfig'
 import Chat from './pages/Chat'
 import Admin from './pages/Admin'
@@ -10,11 +11,13 @@ function App() {
   const { instance, accounts } = useMsal()
 
   const handleLogin = () => {
-    instance.loginPopup(loginRequest).catch(e => console.error(e))
+    instance.loginRedirect(loginRequest).catch(e => console.error(e))
   }
 
   const handleLogout = () => {
-    instance.logoutPopup().catch(e => console.error(e))
+    instance.logoutRedirect({
+      postLogoutRedirectUri: window.location.origin
+    }).catch(e => console.error(e))
   }
 
   return (

@@ -9,6 +9,9 @@ export const msalConfig = {
         cacheLocation: 'sessionStorage',
         storeAuthStateInCookie: false,
     },
+    system: {
+        navigateToLoginRequestUrl: false, // Prevents popup window from loading the app
+    }
 };
 
 // Scopes for the access token
