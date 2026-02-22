@@ -54,14 +54,26 @@ body,
 .nav {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 1.5rem;
   height: 60px;
   background: rgba(17, 24, 39, 0.95);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(12px);
   flex-shrink: 0;
   z-index: 10;
+}
+
+.container {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.nav-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
 }
 
 .nav-brand {
@@ -115,9 +127,11 @@ body,
   flex: 1;
   overflow: hidden;
   display: flex;
+}
+
+.main-container {
+  display: flex;
   flex-direction: column;
-  align-items: center;
-  /* Centers children horizontally */
 }
 
 /* Ensure MSAL wrappers and Page blocks handle width correctly */
@@ -129,12 +143,11 @@ body,
   align-items: center;
 }
 
-/* ===== Page Containers ===== */
+/* Page Containers */
 .page {
   height: 100%;
   width: 100%;
-  display: flex;
-  flex-direction: column;
+  padding-top: 1.5rem;
 }
 
 /* ===== Chat Page ===== */
@@ -144,7 +157,6 @@ body,
   height: 100%;
   max-width: 820px;
   width: 100%;
-  padding: 0 1rem;
   margin: 0 auto;
 }
 

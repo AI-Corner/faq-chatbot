@@ -30,46 +30,50 @@ function App() {
   return (
     <div className="app-container">
       <nav className="nav">
-        <div className="nav-brand">
-          <span className="nav-icon">🤖</span>
-          <span>FAQ Chatbot</span>
-        </div>
-        <div className="nav-tabs">
-          <button
-            className={`nav-tab ${page === 'chat' ? 'active' : ''}`}
-            onClick={() => setPageWithPersist('chat')}
-          >
-            💬 Chat
-          </button>
-          <button
-            className={`nav-tab ${page === 'admin' ? 'active' : ''}`}
-            onClick={() => setPageWithPersist('admin')}
-          >
-            🛠 Admin
-          </button>
-        </div>
-
-        <AuthenticatedTemplate>
-          <div className="nav-user">
-            <span>{accounts[0]?.name}</span>
-            <button onClick={handleLogout} className="btn-logout">Logout</button>
+        <div className="container nav-container">
+          <div className="nav-brand">
+            <span className="nav-icon">🤖</span>
+            <span>FAQ Chatbot</span>
           </div>
-        </AuthenticatedTemplate>
+          <div className="nav-tabs">
+            <button
+              className={`nav-tab ${page === 'chat' ? 'active' : ''}`}
+              onClick={() => setPageWithPersist('chat')}
+            >
+              💬 Chat
+            </button>
+            <button
+              className={`nav-tab ${page === 'admin' ? 'active' : ''}`}
+              onClick={() => setPageWithPersist('admin')}
+            >
+              🛠 Admin
+            </button>
+          </div>
+
+          <AuthenticatedTemplate>
+            <div className="nav-user">
+              <span>{accounts[0]?.name}</span>
+              <button onClick={handleLogout} className="btn-logout">Logout</button>
+            </div>
+          </AuthenticatedTemplate>
+        </div>
       </nav>
 
       <main className="main-content">
-        {page === 'chat' && <Chat />}
+        <div className="container main-container">
+          {page === 'chat' && <Chat />}
 
-        {page === 'admin' && (
-          <MsalAuthenticationTemplate
-            interactionType={InteractionType.Redirect}
-            authenticationRequest={loginRequest}
-            errorComponent={({ error }) => <p>Error: {error.errorMessage}</p>}
-            loadingComponent={() => <div className="empty-state"><span className="spinner" /> Authenticating...</div>}
-          >
-            <Admin />
-          </MsalAuthenticationTemplate>
-        )}
+          {page === 'admin' && (
+            <MsalAuthenticationTemplate
+              interactionType={InteractionType.Redirect}
+              authenticationRequest={loginRequest}
+              errorComponent={({ error }) => <p>Error: {error.errorMessage}</p>}
+              loadingComponent={() => <div className="empty-state"><span className="spinner" /> Authenticating...</div>}
+            >
+              <Admin />
+            </MsalAuthenticationTemplate>
+          )}
+        </div>
       </main>
     </div>
   )
