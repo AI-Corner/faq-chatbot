@@ -59,3 +59,9 @@ logs/
 # ============================
 coverage/
 .nyc_output/
+
+# ============================
+#  GitHub Actions self-hosted runner
+#  (installed locally inside this folder — never commit)
+# ============================
+actions-runner/
