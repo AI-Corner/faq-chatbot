@@ -9,6 +9,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ------- Health Check -------
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const SIMILARITY_THRESHOLD = parseFloat(process.env.SIMILARITY_THRESHOLD || '0.75');
 const MODEL_NAME = process.env.MODEL_NAME || 'gemini-2.5-flash';
@@ -92,6 +97,16 @@ app.post('/api/chat', async (req, res) => {
         });
     } catch (err) {
         console.error('[Chat] Error:', err.message);
+
+        // Handle Gemini Quota / Rate Limit error
+        if (err.message.includes('Resource has been exhausted') || err.message.includes('429')) {
+            return res.status(429).json({
+                answered: true,
+                answer: "I'm receiving too many requests right now. Please wait a few seconds and try again!",
+                isSystemMessage: true
+            });
+        }
+
         res.status(500).json({ error: 'Failed to process question.', details: err.message });
     }
 });
