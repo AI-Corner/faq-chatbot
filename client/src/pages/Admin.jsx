@@ -27,7 +27,8 @@ export default function Admin() {
                 ...loginRequest,
                 account: accounts[0]
             })
-            return { Authorization: `Bearer ${response.accessToken}` }
+            // Use idToken for backend verification (represents the user identity to our app)
+            return { Authorization: `Bearer ${response.idToken}` }
         } catch (e) {
             console.error('Failed to acquire token silently', e)
             return {}
