@@ -16,7 +16,7 @@ app.get('/health', (req, res) => {
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const SIMILARITY_THRESHOLD = parseFloat(process.env.SIMILARITY_THRESHOLD || '0.75');
-const MODEL_NAME = process.env.MODEL_NAME || 'gemini-2.5-flash';
+const MODEL_NAME = process.env.MODEL_NAME || 'gemini-1.5-flash';
 const EMBEDDING_MODEL = 'gemini-embedding-001';
 
 if (!GOOGLE_API_KEY) {
