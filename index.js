@@ -123,7 +123,9 @@ app.post('/api/chat', async (req, res) => {
 // ------- Knowledge Base CRUD -------
 
 app.get('/api/kb', requireAuth, (req, res) => {
-    res.json(db.getAllKBEntries());
+    const entries = db.getAllKBEntries();
+    console.log(`[Admin] Fetching KB: ${entries.length} entries found.`);
+    res.json(entries);
 });
 
 app.post('/api/kb', requireAuth, async (req, res) => {
@@ -162,6 +164,7 @@ app.post('/api/kb/:id/review', (req, res) => {
 app.put('/api/kb/:id', requireAuth, async (req, res) => {
     const { answer } = req.body;
     if (!answer) return res.status(400).json({ error: 'answer is required.' });
+    console.log(`[Admin] Updating KB Entry #${req.params.id}`);
     db.updateKBEntry(req.params.id, answer);
     res.json({ message: 'Entry updated.' });
 });
