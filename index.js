@@ -73,7 +73,16 @@ app.post('/api/chat', async (req, res) => {
 
         if (matches.length > 0) {
             console.log(`[Chat] Found ${matches.length} match(es), top score: ${matches[0].score.toFixed(3)}`);
-            const answer = await generateAnswer(question, matches);
+
+            let answer;
+            try {
+                answer = await generateAnswer(question, matches);
+            } catch (aiErr) {
+                console.error('[Chat] Gemini Error, falling back to direct KB answer:', aiErr.message);
+                // Fallback: If AI fails, use the answer from the best match directly
+                answer = matches[0].answer;
+            }
+
             return res.json({
                 answered: true,
                 answer,
