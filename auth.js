@@ -35,6 +35,9 @@ const requireAuth = (req, res, next) => {
     }, (err, decoded) => {
         if (err) {
             console.error('JWT Verification Error:', err.message);
+            const unverified = jwt.decode(token, { complete: true });
+            console.log('Unverified Token Header:', JSON.stringify(unverified?.header));
+            console.log('Unverified Token Payload:', JSON.stringify(unverified?.payload));
             return res.status(401).json({ error: 'Unauthorized: Invalid token' });
         }
 
